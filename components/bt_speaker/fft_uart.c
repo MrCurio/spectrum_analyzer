@@ -25,6 +25,7 @@ static float *y1_cf = &y_cf[0];
 float wind[N_SAMPLES];
 
 
+
 void renderFFT(void *param);
 
 void init_fft_thread(){
@@ -107,20 +108,18 @@ void renderFFT(void *param){
             dsps_fft2r_fc32(y_cf, N_SAMPLES);
             dsps_bit_rev_fc32(y_cf, N_SAMPLES);
 
-            // for (int i = 0; i < N_SAMPLES / 2; i++)
-            // {
-            //     y1_cf[i] = 10 * log10f((y1_cf[i * 2 + 0] * y1_cf[i * 2 + 0] + y1_cf[i * 2 + 1] * y1_cf[i * 2 + 1]) / BUFFER_FFT);
-            // }
+            for (int i = 0; i < N_SAMPLES / 2; i++)
+            {
+                y1_cf[i] = 10 * log10f((y1_cf[i * 2 + 0] * y1_cf[i * 2 + 0] + y1_cf[i * 2 + 1] * y1_cf[i * 2 + 1]) / BUFFER_FFT);
+                // if(i % 10 == 0){
+                //     ESP_LOGI(TAG, "Valor %d: %f",i, y1_cf[i]);
+                // }
+                //vTaskDelay(1000 / portTICK_PERIOD_MS);
+            }
 
-            // dsps_view(y1_cf, N_SAMPLES / 2, 128, 20, -60, 40, '|');
-       
-            // int t_len = uart_write_bytes(UART_NUM_2, (const char *) data, 9); //Send Request of 9 bytes = 8bytes + CRC
-            // if (t_len <= 0)
-            // {
-            //     ESP_LOGE(TAG, "ERROR SENDING TO UART -> TX");
-            // }
+            //dsps_view(y1_cf, N_SAMPLES / 2, 14, 20, -60, 40, '|');
 
-            float max = 0;
+            float max = -100;
             float min = 0;
             int max_pos = 0;
             int min_pos = 0;
@@ -142,15 +141,171 @@ void renderFFT(void *param){
 
             /* Algoritmo para procesar los datos por bandas */
             // 1. Determinamos los máximos y mínimos globales y escalamos con respecto a ellos
+            uint8_t *data_uart = malloc(sizeof(int) * 13);
+            
+            int offset = 0;
+            int suma = 0;
+            int crc = 0;
+            for (int i = 0; i < N_SAMPLES/2; i++)
+            {
+                if (i <= 3) //0-65 Hz
+                {
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 3)
+                    {
+                        suma = suma/4;   
+                        crc = crc + suma;
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }                                   
+                }
+                else if(i <= 5){ //65-100 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 5)
+                    {
+                        suma = suma/2;    
+                        crc = crc + suma;
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else if(i <= 9){ //100-200 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 9)
+                    {
+                        suma = suma/4;    
+                        crc = crc + suma;
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else if(i <= 14){ //200-300 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 14)
+                    {
+                        suma = suma/6;   
+                        crc = crc + suma; 
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else if(i <= 23){ //300-500 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 23)
+                    {
+                        suma = suma/10;   
+                        crc = crc + suma; 
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else if(i <= 37){ //500-800 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 37)
+                    {
+                        suma = suma/15;  
+                        crc = crc + suma;  
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else if(i <= 47){ //800-1k Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 47)
+                    {
+                        suma = suma/11; 
+                        crc = crc + suma;   
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else if(i <= 70){ //1k-1500 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 70)
+                    {
+                        suma = suma/24; 
+                        crc = crc + suma;   
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else if(i <= 140){ //1500-3000 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 140)
+                    {
+                        suma = suma/71;    
+                        crc = crc + suma;
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else if(i <= 372){ //3000-8000 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 372)
+                    {
+                        suma = suma/233;  
+                        crc = crc + suma;  
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else if(i <= 560){ //8000-12000 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 560)
+                    {
+                        suma = suma/189;   
+                        crc = crc + suma; 
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }
+                else { //12000-22000 Hz
+                    suma = suma + (int)(y1_cf[i] + 150);
+                    if (i == 1023)
+                    {
+                        suma = suma/464; 
+                        crc = crc + suma;   
+                        memcpy(data_uart + offset, &suma, sizeof(suma));
+                        offset = offset + sizeof(suma); 
+                        suma = 0;
+                    }   
+                }          
+                
+            }
 
-            // 2. Determinamos las bandas horizontales y verticales
-            // Verticales: (max - min)/N_bandas_verticales
-            // Horizontales: (N_Samples/2)/N_bandas_horizontales
-
-            // 3. Clasificamos en bandas horizontales y verticales según posición del buffer y valor
+            memcpy(data_uart + offset, &crc, sizeof(crc));
 
 
-            //4. Transmitimos por puerto serie el valor de dichas bandas del 1-N_bandas
+            int valores[13] = {0};
+            memcpy(valores, data_uart, sizeof(int) * 13);
+
+            for (int i = 0; i < 13; i++)
+            {
+                ESP_LOGI(TAG, "Valores UART: %d:  %d", i, valores[i]);
+            }
+
+
+
+            // int t_len = uart_write_bytes(UART_NUM_2, (const char *) data_uart, 13 * sizeof(int)); //Send Request of 9 bytes = 8bytes + CRC
+            // if (t_len <= 0)
+            // {
+            //     ESP_LOGE(TAG, "ERROR SENDING TO UART -> TX");
+            // }
+
+
+            free(data_uart);
+            
 
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             
