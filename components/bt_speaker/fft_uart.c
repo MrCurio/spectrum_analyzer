@@ -19,10 +19,10 @@
 static QueueHandle_t data_queue;
 static uint8_t fft_buffer[BUFFER_FFT];
 
-static float y_cf[BUFFER_FFT * 2];
+float x[N_SAMPLES];
+static float y_cf[N_SAMPLES * 2];
 static float *y1_cf = &y_cf[0];
-float wind[BUFFER_FFT];
-double vReal[BUFFER_FFT];
+float wind[N_SAMPLES];
 
 
 void renderFFT(void *param);
@@ -57,7 +57,7 @@ void init_fft_thread(){
 
     //Init FFT DSP
     ESP_ERROR_CHECK(dsps_fft2r_init_fc32(NULL, BUFFER_FFT));
-    dsps_wind_hann_f32(wind, BUFFER_FFT); //Creamos una ventana tipo hanning
+    dsps_wind_hann_f32(wind, N_SAMPLES); //Creamos una ventana tipo hanning
 
     
     // if (err != ESP_OK)
@@ -70,15 +70,8 @@ void init_fft_thread(){
 
 
 void process_stream(const uint8_t *data){ //(void *) &valor
-    int byteOffset = 0;
-    for (int i = 0; i < BUFFER_FFT; i++) {
-      int16_t sample_l_int = (int16_t)(((*(data + byteOffset + 1) << 8) | *(data + byteOffset)));
-      int16_t sample_r_int = (int16_t)(((*(data + byteOffset + 3) << 8) | *(data + byteOffset + 2)));
-      vReal[i] = (sample_l_int + sample_r_int) / 2.0f;
-      byteOffset = byteOffset + 4;
-    }
 
-    xQueueSend(data_queue, (void *)&vReal, ( TickType_t ) 0 ); //Non-blocking if queue is full
+    xQueueSend(data_queue, (void *)data, ( TickType_t ) 0 ); //Non-blocking if queue is full
 }
 
 void renderFFT(void *param){
@@ -87,22 +80,41 @@ void renderFFT(void *param){
     {
         if( xQueueReceive( data_queue, fft_buffer, portMAX_DELAY)){
 
-            for (int i = 0; i < BUFFER_FFT; i++)
+            int t = 0;
+            static int16_t sample_l_int = 0;
+            static int16_t sample_r_int = 0;
+            static float sample_l_float = 0.0f;
+            static float sample_r_float = 0.0f;
+            static float in = 0.0f;
+
+            for (uint32_t i = 0; i < N_SAMPLES; i += 4)
             {
-                y_cf[i * 2 + 0] = fft_buffer[i] * wind[i];
+                sample_l_int = (int16_t)((*(fft_buffer + i + 1) << 8) | *(fft_buffer + i));
+                sample_r_int = (int16_t)((*(fft_buffer + i + 3) << 8) | *(fft_buffer + i + 2));
+                sample_l_float = (float)sample_l_int / 0x8000;
+                sample_r_float = (float)sample_r_int / 0x8000;
+                in = (sample_l_float + sample_r_float) / 2.0f;
+                x[t] = in * wind[t];
+                t++;
+            }           
+
+            for (int i = 0; i < N_SAMPLES; i++)
+            {
+                y_cf[i * 2 + 0] = x[i];
                 y_cf[i * 2 + 1] = 0;
             }
 
-            dsps_fft2r_fc32(y_cf, BUFFER_FFT);
-            dsps_bit_rev_fc32(y_cf, BUFFER_FFT);
-            dsps_cplx2reC_fc32(y_cf, BUFFER_FFT);
+            dsps_fft2r_fc32(y_cf, N_SAMPLES);
+            dsps_bit_rev_fc32(y_cf, N_SAMPLES);
+            dsps_cplx2reC_fc32(y_cf, N_SAMPLES);
 
-            for (int i = 0; i < BUFFER_FFT / 2; i++)
+            for (int i = 0; i < N_SAMPLES / 2; i++)
             {
                 y1_cf[i] = 10 * log10f((y1_cf[i * 2 + 0] * y1_cf[i * 2 + 0] + y1_cf[i * 2 + 1] * y1_cf[i * 2 + 1]) / BUFFER_FFT);
             }
 
-            //dsps_view(y1_cf, BUFFER_FFT / 2, 128, 30, -20, 100, '|');
+            dsps_view(y1_cf, N_SAMPLES / 2, 128, 20, -60, 40, '|');
+            vTaskDelay(10 / portTICK_PERIOD_MS);
             
         }
     }

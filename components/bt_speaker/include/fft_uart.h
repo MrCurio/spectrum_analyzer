@@ -4,6 +4,7 @@
 #include "driver/gpio.h"
 
 #define BUFFER_FFT 4096
+#define N_SAMPLES 2048
 
 #define TX_FFT GPIO_NUM_18
 #define RX_FFT GPIO_NUM_19
