@@ -5,7 +5,10 @@
     "playerconfig.h": "c",
     "complex.h": "c",
     "complex": "c",
-    "esp_log.h": "c"
+    "esp_log.h": "c",
+    "chrono": "cpp",
+    "random": "cpp",
+    "limits": "cpp"
   },
   "idf.adapterTargetName": "esp32",
   "idf.openOcdConfigs": [

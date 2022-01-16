@@ -51,7 +51,7 @@ void init_fft_thread(){
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
     };
 
-    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_2, 1024 * 2, 0, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_2, 2048, 0, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(UART_NUM_2, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM_2, TX_FFT, RX_FFT, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
@@ -106,15 +106,53 @@ void renderFFT(void *param){
 
             dsps_fft2r_fc32(y_cf, N_SAMPLES);
             dsps_bit_rev_fc32(y_cf, N_SAMPLES);
-            dsps_cplx2reC_fc32(y_cf, N_SAMPLES);
 
-            for (int i = 0; i < N_SAMPLES / 2; i++)
+            // for (int i = 0; i < N_SAMPLES / 2; i++)
+            // {
+            //     y1_cf[i] = 10 * log10f((y1_cf[i * 2 + 0] * y1_cf[i * 2 + 0] + y1_cf[i * 2 + 1] * y1_cf[i * 2 + 1]) / BUFFER_FFT);
+            // }
+
+            // dsps_view(y1_cf, N_SAMPLES / 2, 128, 20, -60, 40, '|');
+       
+            // int t_len = uart_write_bytes(UART_NUM_2, (const char *) data, 9); //Send Request of 9 bytes = 8bytes + CRC
+            // if (t_len <= 0)
+            // {
+            //     ESP_LOGE(TAG, "ERROR SENDING TO UART -> TX");
+            // }
+
+            float max = 0;
+            float min = 0;
+            int max_pos = 0;
+            int min_pos = 0;
+            for (int i = 0; i < N_SAMPLES/2; i++)
             {
-                y1_cf[i] = 10 * log10f((y1_cf[i * 2 + 0] * y1_cf[i * 2 + 0] + y1_cf[i * 2 + 1] * y1_cf[i * 2 + 1]) / BUFFER_FFT);
-            }
+                if (y1_cf[i] > max)
+                {
+                    max = y1_cf[i];
+                    max_pos = i;
+                }
+                if (y1_cf[i] < min)
+                {
+                    min = y1_cf[i];
+                    min_pos = i;
+                }
+            }          
 
-            dsps_view(y1_cf, N_SAMPLES / 2, 128, 20, -60, 40, '|');
-            vTaskDelay(10 / portTICK_PERIOD_MS);
+            ESP_LOGI(TAG, "Max: %f      Min: %f     Max Pos: %d     Min Pos: %d", max, min, max_pos, min_pos);
+
+            /* Algoritmo para procesar los datos por bandas */
+            // 1. Determinamos los máximos y mínimos globales y escalamos con respecto a ellos
+
+            // 2. Determinamos las bandas horizontales y verticales
+            // Verticales: (max - min)/N_bandas_verticales
+            // Horizontales: (N_Samples/2)/N_bandas_horizontales
+
+            // 3. Clasificamos en bandas horizontales y verticales según posición del buffer y valor
+
+
+            //4. Transmitimos por puerto serie el valor de dichas bandas del 1-N_bandas
+
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
             
         }
     }
