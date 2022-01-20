@@ -37,7 +37,7 @@ void init_fft_thread(){
                             "FFT Renderer", // Name of the task (for debugging)
                             2048,          // Stack size (bytes)
                             NULL,           // Parameter to pass
-                            1,              // Task priority
+                            10,              // Task priority
                             NULL,           // Task handle
                             1               // Core you want to run the task on (0 or 1)
     );
@@ -45,16 +45,17 @@ void init_fft_thread(){
     /* Configure parameters of an UART driver,
      * communication pins and install the driver */
     uart_config_t uart_config = {
-        .baud_rate = 9600,
+        .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
         .parity    = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
     };
 
-    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_2, 2048, 0, 0, NULL, 0));
-    ESP_ERROR_CHECK(uart_param_config(UART_NUM_2, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_2, TX_FFT, RX_FFT, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, 2048, 0, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, TX_FFT, RX_FFT, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
     //Init FFT DSP
     ESP_ERROR_CHECK(dsps_fft2r_init_fc32(NULL, BUFFER_FFT));
@@ -137,11 +138,12 @@ void renderFFT(void *param){
                 }
             }          
 
-            ESP_LOGI(TAG, "Max: %f      Min: %f     Max Pos: %d     Min Pos: %d", max, min, max_pos, min_pos);
+            // ESP_LOGI(TAG, "Max: %f      Min: %f     Max Pos: %d     Min Pos: %d", max, min, max_pos, min_pos);
 
             /* Algoritmo para procesar los datos por bandas */
             // 1. Determinamos los máximos y mínimos globales y escalamos con respecto a ellos
-            uint8_t *data_uart = malloc(sizeof(int) * 13);
+            uint8_t *data_uart = malloc(sizeof(int) * 12);
+            uint8_t *data_final = malloc(sizeof(uint8_t) * 12);
             
             int offset = 0;
             int suma = 0;
@@ -284,30 +286,58 @@ void renderFFT(void *param){
                 
             }
 
-            memcpy(data_uart + offset, &crc, sizeof(crc));
+            //memcpy(data_uart + offset, &crc, sizeof(crc));
 
 
-            int valores[13] = {0};
-            memcpy(valores, data_uart, sizeof(int) * 13);
+            // int valores[13] = {0};
+            // memcpy(valores, data_uart, sizeof(int) * 13);
 
-            for (int i = 0; i < 13; i++)
+            // for (int i = 0; i < 13; i++)
+            // {
+            //     ESP_LOGI(TAG, "Valores UART: %d:  %d", i, valores[i]);
+            // }
+
+            for (int i = 0; i < 12; i++)
             {
-                ESP_LOGI(TAG, "Valores UART: %d:  %d", i, valores[i]);
+                data_final[i] = data_uart[i*4];
             }
-
-
-
-            // int t_len = uart_write_bytes(UART_NUM_2, (const char *) data_uart, 13 * sizeof(int)); //Send Request of 9 bytes = 8bytes + CRC
+            
+            //uint8_t rcv[3] = {0};
+            // int t_len = uart_write_bytes(UART_NUM_1, (const char *) rcv, 3);
+            // ESP_LOGI(TAG, "Len valores enviados: %d", t_len);
             // if (t_len <= 0)
             // {
             //     ESP_LOGE(TAG, "ERROR SENDING TO UART -> TX");
             // }
 
+            // vTaskDelay(10 / portTICK_PERIOD_MS);
+            // uint8_t rcv[52] = {0};
+            // for (int i = 0; i < 52; i++)
+            // {
+            //     rcv[i] = i;
+            // }
+            
+            //ESP_LOGI("Test", "Valores son: %d:%d:%d", rcv[0], rcv[1], rcv[2]);
+            //int len = uart_write_bytes(UART_NUM_1, (const char *) data_uart, sizeof(int) * 3);
+            //ESP_LOGI(TAG, "Valores enviados: %d", len);
+            uart_write_bytes(UART_NUM_1, (const char *) data_final, sizeof(uint8_t) * 12);
+            // uint8_t *data_rcv = malloc(sizeof(int) * 13);
+            // int len = uart_read_bytes(UART_NUM_1, data_rcv, sizeof(int) * 13, portMAX_DELAY);
+            // ESP_LOG_BUFFER_HEX(TAG, data_rcv, sizeof(int) * 13);
+            // free(data_rcv);
+            // for (int i = 0; i < 12; i++)
+            // {
+            //     ESP_LOGI("TAG", "Valor: %d      %d", i, data_final[i]);
+            // }
+            
+            // ESP_LOGI("TAG", "------------------------------------------");
+
 
             free(data_uart);
+            free(data_final);
             
 
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
             
         }
     }

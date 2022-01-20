@@ -6,8 +6,8 @@
 #define BUFFER_FFT 4096
 #define N_SAMPLES 2048
 
-#define TX_FFT GPIO_NUM_18
-#define RX_FFT GPIO_NUM_19
+#define TX_FFT GPIO_NUM_16
+#define RX_FFT GPIO_NUM_17
 
 void init_fft_thread();
 
