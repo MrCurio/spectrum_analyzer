@@ -12,4 +12,6 @@
 void init_fft_thread();
 
 void process_stream(const uint8_t *data);
+
+void add_new_song_info(uint8_t attr_id, uint8_t *text, int len);
 #endif

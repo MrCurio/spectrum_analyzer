@@ -6,6 +6,7 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "esp_avrc_api.h"
 
 #include "esp_dsp.h"
 #include <math.h>
@@ -24,7 +25,29 @@ static float y_cf[N_SAMPLES * 2];
 static float *y1_cf = &y_cf[0];
 float wind[N_SAMPLES];
 
+bool new_song = false;
+uint8_t song_title[30] = {0};
+uint8_t song_artist_len = 0;
+uint8_t song_artist[20] = {0};
 
+void add_new_song_info(uint8_t attr_id, uint8_t *text, int len){
+    switch (attr_id)
+    {
+    case ESP_AVRC_MD_ATTR_TITLE:
+        memset(song_title, 0, sizeof(song_title));
+        memcpy(song_title + 1, text, len);
+        break;
+    case ESP_AVRC_MD_ATTR_ARTIST:
+        memset(song_artist, 0, sizeof(song_artist));
+        song_artist_len = 0;
+        memcpy(song_artist, text, len);
+        song_artist_len = song_artist_len + len;
+        new_song = true;
+        break;
+    default:
+        break;
+    } 
+}
 
 void renderFFT(void *param);
 
@@ -118,27 +141,8 @@ void renderFFT(void *param){
                 //vTaskDelay(1000 / portTICK_PERIOD_MS);
             }
 
-            //dsps_view(y1_cf, N_SAMPLES / 2, 14, 20, -60, 40, '|');
+            //dsps_view(y1_cf, N_SAMPLES / 2, 14, 20, -60, 40, '|');       
 
-            float max = -100;
-            float min = 0;
-            int max_pos = 0;
-            int min_pos = 0;
-            for (int i = 0; i < N_SAMPLES/2; i++)
-            {
-                if (y1_cf[i] > max)
-                {
-                    max = y1_cf[i];
-                    max_pos = i;
-                }
-                if (y1_cf[i] < min)
-                {
-                    min = y1_cf[i];
-                    min_pos = i;
-                }
-            }          
-
-            // ESP_LOGI(TAG, "Max: %f      Min: %f     Max Pos: %d     Min Pos: %d", max, min, max_pos, min_pos);
 
             /* Algoritmo para procesar los datos por bandas */
             // 1. Determinamos los máximos y mínimos globales y escalamos con respecto a ellos
@@ -320,7 +324,25 @@ void renderFFT(void *param){
             //ESP_LOGI("Test", "Valores son: %d:%d:%d", rcv[0], rcv[1], rcv[2]);
             //int len = uart_write_bytes(UART_NUM_1, (const char *) data_uart, sizeof(int) * 3);
             //ESP_LOGI(TAG, "Valores enviados: %d", len);
-            uart_write_bytes(UART_NUM_1, (const char *) data_final, sizeof(uint8_t) * 12);
+            if (new_song)
+            { 
+                uint8_t test[12] = "}Nicky Jam{";
+                song_title[0] = '}';
+                song_artist[song_artist_len] = '{';
+                uint8_t buffer_info[48] = {0};
+                memcpy(buffer_info, song_title, 28);
+                memcpy(buffer_info + 28, song_artist, 20);
+                ESP_LOGI(TAG, "Titulo: %s   Artista: %s", song_title, song_artist);
+                uart_write_bytes(UART_NUM_1, (const char *) buffer_info, 48); 
+                ESP_LOGI(TAG, "Valor guardado: %s", buffer_info);
+                //uart_write_bytes(UART_NUM_1, (const char *) test, 12); 
+                // uart_write_bytes(UART_NUM_1, (const char *) song_artist, 20); 
+                new_song = false;
+            }
+            else {
+                uart_write_bytes(UART_NUM_1, (const char *) data_final, sizeof(uint8_t) * 12);
+            }
+            
             // uint8_t *data_rcv = malloc(sizeof(int) * 13);
             // int len = uart_read_bytes(UART_NUM_1, data_rcv, sizeof(int) * 13, portMAX_DELAY);
             // ESP_LOG_BUFFER_HEX(TAG, data_rcv, sizeof(int) * 13);
